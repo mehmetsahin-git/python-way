@@ -1,33 +1,79 @@
-# Port Scanner - Day 1: Banner
 import socket
+import ipaddress
+import time
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
+services = {
+    21: "FTP",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    53: "DNS",
+    80: "HTTP",
+    110: "POP3",
+    143: "IMAP",
+    443: "HTTPS",
+    3306: "MySQL",
+    3389: "RDP",
+    5355: "LLMNR",
+    8080: "HTTP-Alt"
+}
+
+open_ports = []
+lock = threading.Lock()
 
 
 def scan_port(target, port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1)
-    result = s.connect_ex((target, port))
-    s.close()
-    if result == 0:
-          return True
-    else:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.2)
+        result = s.connect_ex((target, port))
+        s.close()
+        if result == 0:
+            service = services.get(port, "Unknown")
+            with lock:
+                print(f"port {port} ({service}) is OPEN")
+                open_ports.append(port)
+    except socket.error:
+        pass
+
+
+def is_valid_target(target):
+    try:
+        ipaddress.ip_address(target)
+        return True
+    except ValueError:
         return False
 
 
 print("=== Port Scanner v0.1 ===")
 while True:
     target = input("Target IP: ")
-    start_port = int(input("Start port: "))
-    end_port = int(input("End port: "))
+    try:
+        start_port = int(input("Start port: "))
+        end_port = int(input("End port: "))
+    except ValueError:
+        print("Error: ports must be numbers")
+        continue
 
     if start_port < 1 or end_port > 65535:
         print("Error: ports must be between 1 and 65535")
     elif start_port > end_port:
         print("Error: start port cannot be greater than end port")
-    else: 
-        for port in range(start_port, end_port + 1):
-            if scan_port(target, port):
-                print(f"port {port} is OPEN")
+    elif not is_valid_target(target):
+        print("Error: invalid target")
+    else:
+        open_ports = []
+        baslangic = time.time()
+        with ThreadPoolExecutor(max_workers=100) as executor:
+            for port in range(start_port, end_port + 1):
+                executor.submit(scan_port, target, port)
+        sure = time.time() - baslangic
         print("Scan complete.")
+        open_ports.sort()
+        print(f"Found {len(open_ports)} open ports: {open_ports}")
+        print(f"Scan took {sure:.2f} seconds")
 
     again = input("Scan again? (y/n): ")
     if again == "n":
