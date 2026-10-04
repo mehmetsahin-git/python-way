@@ -1,8 +1,8 @@
 import socket
 import ipaddress
 import time
-from concurrent.futures import ThreadPoolExecutor
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 services = {
     21: "FTP",
@@ -20,6 +20,7 @@ services = {
     8080: "HTTP-Alt"
 }
 
+expected_ports = [5355]
 open_ports = []
 lock = threading.Lock()
 
@@ -27,7 +28,7 @@ lock = threading.Lock()
 def scan_port(target, port):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(0.2)
+        s.settimeout(0.5)
         result = s.connect_ex((target, port))
         s.close()
         if result == 0:
@@ -74,6 +75,19 @@ while True:
         open_ports.sort()
         print(f"Found {len(open_ports)} open ports: {open_ports}")
         print(f"Scan took {sure:.2f} seconds")
+
+        # whitelist check and report file
+        with open("scan_report.txt", "w") as f:
+            f.write(f"Target: {target}\n")
+            f.write(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            for p in open_ports:
+                service = services.get(p, "Unknown")
+                if p in expected_ports:
+                    status = "normal"
+                else:
+                    status = "SUSPICIOUS"
+                print(f"port {p} ({service}): {status}")
+                f.write(f"port {p} ({service}): {status}\n")
 
     again = input("Scan again? (y/n): ")
     if again == "n":
